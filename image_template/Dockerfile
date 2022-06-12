@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu
 
 COPY user-mapping.sh /
 RUN  chmod u+x /user-mapping.sh

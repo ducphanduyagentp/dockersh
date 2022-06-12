@@ -14,6 +14,7 @@ import sys
 from pwd import getpwnam
 import socket
 import os
+from docker.types import Ulimit
 
 prog = 'dockersh'
 version = prog + " v1.0"
@@ -91,9 +92,9 @@ def parse_args():
                         default="") #.completer = ChoicesCompleter(tuple(containers))
     parser.add_argument('-t', '--temporary',
                         dest='temp',
-                        action='store_true',
+                        action='store_false',
                         help="execute in temporary container",
-                        default=False)
+                        default=True)
     parser.add_argument('-c', '--command',
                         dest='cmd',
                         help="pass command to bash in container",
@@ -114,7 +115,7 @@ def parse_args():
 
 
 # load ini
-cfg = ConfigParser({"USER": user, "HOSTNAME": hostname}, interpolation=ExtendedInterpolation())
+cfg = ConfigParser({"USER": user, "HOSTNAME": hostname, "HOME": os.environ.get('HOME')}, interpolation=ExtendedInterpolation())
 cfg.read(config_file, encoding="utf-8")
 
 if os.getenv("USER") and user != os.getenv('USER') and user in cfg["ADMIN"]["names"].splitlines():
@@ -209,9 +210,10 @@ if len(containers(container_filter=args.name)) == 0:
     volumes = [v.split(":") for v in volumes]
     binds = {v[0].strip():{"bind":v[1].strip(),"mode":v[2].strip()} for v in volumes}
     volumes = [v[1] for v in volumes]
-
+    ulimit_dct = Ulimit(name='nproc', soft=64, hard=128)
     host_config = cli.create_host_config(
         binds=binds,
+        ulimits=[ulimit_dct],
         restart_policy={'Name' : 'unless-stopped'})
 
     #cli.pull(args.image)
@@ -235,10 +237,11 @@ if len(containers(container_filter=args.name)) == 0:
 
 cli.start(args.full_name)
 if initing:
-    print("Initializing container ...")
+    # print("Initializing container ...")
     #os.popen('docker exec '+args.full_name + ' /bin/bash -c "if [ -e /init-user ]; then /init-user; else echo \"No Initialization skript found for container\"; fi; echo Initialization finished."').read().split(":")[-1]
     init_cmd = 'docker exec '+args.full_name + ' /bin/bash -c "if [ -e /init-user ]; then /init-user; else echo \\\"No Initialization skript found for container\\\"; fi; echo Initialization finished."'
-    print(os.popen(init_cmd).read())
+    #print(os.popen(init_cmd).read())
+    os.popen(init_cmd)
     #print("Please login again.")
     #sys.exit(0)
 if len(args.cmd) == 0:
